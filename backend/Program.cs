@@ -1,3 +1,4 @@
+using QRCoder;
 using OtpNet;
 using backend.Models;
 
@@ -20,12 +21,14 @@ var app = builder.Build();
 
 app.UseCors("ReactPolicy");
 
+// Descomentar si deseas OpenAPI
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// Para evitar problemas locales
+// app.UseHttpsRedirection();
 
 app.MapGet("/", () =>
 {
@@ -37,15 +40,45 @@ app.MapGet("/", () =>
     });
 });
 
+app.MapGet("/api/otp/generate", () =>
+{
+    // Secret fijo para el piloto
+    var secret = "JBSWY3DPEHPK3PXP";
+
+    var otpUri =
+        $"otpauth://totp/DemoOTP?secret={secret}&issuer=Jarvis";
+
+    using var qrGenerator = new QRCodeGenerator();
+
+    var qrData = qrGenerator.CreateQrCode(
+        otpUri,
+        QRCodeGenerator.ECCLevel.Q
+    );
+
+    var pngQrCode = new PngByteQRCode(qrData);
+
+    byte[] qrBytes = pngQrCode.GetGraphic(20);
+
+    var base64Qr =
+        $"data:image/png;base64,{Convert.ToBase64String(qrBytes)}";
+
+    return Results.Ok(
+        new OtpQrResponse
+        {
+            Secret = secret,
+            QrCode = base64Qr
+        });
+});
+
 app.MapPost("/api/otp/validate", (OtpRequest request) =>
 {
-    var secret = builder.Configuration["OTP_SECRET"];
+    var secret = request.Secret;
 
-    if (string.IsNullOrEmpty(secret))
+    if (string.IsNullOrWhiteSpace(secret))
     {
         return Results.Problem(
-            title: "Configuración inválida",
-            detail: "La variable OTP_SECRET no está configurada."
+            title: "Error",
+            detail: "Debe enviar el Secret."
         );
     }
 
@@ -77,6 +110,14 @@ app.MapPost("/api/otp/validate", (OtpRequest request) =>
             detail: ex.Message
         );
     }
+});
+
+app.MapGet("/version", () =>
+{
+    return Results.Ok(new
+    {
+        Version = "QR-OTP-20260605"
+    });
 });
 
 app.Run();
