@@ -20,7 +20,7 @@ function App() {
       setLoading(true)
 
       const response = await axios.post(
-        'http://localhost:5091/api/otp/validate',
+        'https://reactotpdemo.onrender.com/api/otp/validate',
         {
           otp: otp
         }
