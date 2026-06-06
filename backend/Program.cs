@@ -32,32 +32,51 @@ app.MapGet("/", () =>
     return Results.Ok(new
     {
         Aplicacion = "Demo OTP Jarvis",
-        Version = "1.0"
+        Version = "1.0",
+        Estado = "Activo"
     });
 });
 
 app.MapPost("/api/otp/validate", (OtpRequest request) =>
 {
-    var secret = "JBSWY3DPEHPK3PXP";
+    var secret = builder.Configuration["OTP_SECRET"];
 
-    var secretBytes = Base32Encoding.ToBytes(secret);
+    if (string.IsNullOrEmpty(secret))
+    {
+        return Results.Problem(
+            title: "Configuración inválida",
+            detail: "La variable OTP_SECRET no está configurada."
+        );
+    }
 
-    var totp = new Totp(secretBytes);
+    try
+    {
+        var secretBytes = Base32Encoding.ToBytes(secret);
 
-    bool isValid = totp.VerifyTotp(
-        request.Otp,
-        out long timeStepMatched,
-        VerificationWindow.RfcSpecifiedNetworkDelay
-    );
+        var totp = new Totp(secretBytes);
 
-    return Results.Ok(
-        new OtpResponse
-        {
-            Success = isValid,
-            Message = isValid
-                ? "OTP válido"
-                : "OTP inválido"
-        });
+        bool isValid = totp.VerifyTotp(
+            request.Otp,
+            out long timeStepMatched,
+            VerificationWindow.RfcSpecifiedNetworkDelay
+        );
+
+        return Results.Ok(
+            new OtpResponse
+            {
+                Success = isValid,
+                Message = isValid
+                    ? "OTP válido"
+                    : "OTP inválido"
+            });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Error de validación",
+            detail: ex.Message
+        );
+    }
 });
 
 app.Run();
